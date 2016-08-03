@@ -1,0 +1,107 @@
+---
+title: "Machine Learning Course Project"
+author: "Jackie O'Dwyer"
+date: "Monday, July 25, 2016"
+output: pdf_document
+---
+
+# Practical Machine Learning Course Project 
+
+## Executive Summary
+In the course project for Practical Machine Learning we will investigate the data set of accelerometers for particular activities.  We will focus on predicting the manner in which exercise was performed.
+
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har
+
+## Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+## Data Load and Package Load
+```{r, echo=TRUE}
+Train <- read.csv('pml-training.csv', na.strings=c("NA","#DIV/0!",""))
+Test <- read.csv('pml-testing.csv', na.strings=c("NA","#DIV/0!",""))
+
+library(caret)
+library(ggplot2)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(RColorBrewer)
+library(rattle)
+```
+
+## Split Up Training and Testing Data
+```{r, echo=TRUE}
+
+inTrain <- createDataPartition(y=Train$classe, p=0.6, list=FALSE)
+myTrain <- Train[inTrain, ]
+myTest <- Train[-inTrain, ]
+dim(myTrain)
+
+#Remove first column of IDs to avoid use in models
+myTrain <- myTrain[c(-1)]
+
+# Remove Variables with too many NAs. With a threshold of 70%
+trainingV1 <- myTrain #creating another subset to iterate in loop
+for(i in 1:length(myTrain)) { #for every column in the training dataset
+        if( sum( is.na( myTrain[, i] ) ) /nrow(myTrain) >= .7 ) { #if n?? NAs > 70% of total observations
+        for(j in 1:length(trainingV1)) {
+            if( length( grep(names(myTrain[i]), names(trainingV1)[j]) ) ==1)  { #if the columns are the same:
+                trainingV1 <- trainingV1[ , -j] #Remove that column
+            }   
+        } 
+    }
+}
+#To check the new # of observations
+dim(trainingV1)
+
+# Run same for Testing data
+myTest <- myTest[c(-1)]
+dim(myTest)
+# Remove Variables with too many NAs. With a threshold of 70%
+testingV1 <- myTest #creating another subset to iterate in loop
+for(i in 1:length(myTest)) { #for every column in the training dataset
+        if( sum( is.na( myTest[, i] ) ) /nrow(myTest) >= .7 ) { #if n?? NAs > 70% of total observations
+        for(j in 1:length(testingV1)) {
+            if( length( grep(names(myTest[i]), names(testingV1)[j]) ) ==1)  { #if the columns are the same:
+                testingV1 <- testingV1[ , -j] #Remove that column
+            }   
+        } 
+    }
+}
+#To check the new # of observations
+dim(testingV1)
+
+
+```
+
+## Model Building and Selection
+
+``` {r, echo=TRUE}
+# rpart model testing
+set.seed(500)
+rpartModFit<-train(classe~.,method="rpart", data=trainingV1)
+
+print(rpartModFit$finalModel)
+
+fancyRpartPlot(rpartModFit$finalModel,cex=.5,under.cex=1,shadow.offset=0)
+
+classepredict <- predict(rpartModFit,testingV1)
+confusionMatrix(testingV1$classe,classepredict)
+
+# This model is not very strong, as it has only a 55.4% accuracy.
+
+# Random Forest Model Testing
+set.seed(500)
+
+RFmodFit <- randomForest(classe~., data = trainingV1)
+print(RFmodFit)
+
+RFclassepredict <- predict(RFmodFit,testingV1)
+confusionMatrix(testingV1$classe,RFclassepredict)
+
+# The Random Forest Model is a much better predictor of the classe field. This model has a 99.9% accuracy.
+```
+
+
+
